@@ -108,6 +108,7 @@ func main() {
 	}
 
 	go func() {
+		defer os.Exit(0)
 		for {
 			select {
 			case bet := <-chBet:
@@ -117,20 +118,20 @@ func main() {
 			case <-chPlayTimes:
 				playingTotalPlayTimes++
 			case <-chQuit:
+				playingTotalRTP = float64(playingTotalWin) / float64(playingTotalBet)
+				fmt.Printf("PlayingTotalBet:%d \n", playingTotalBet)
+				fmt.Printf("PlayingTotalWin:%d \n", playingTotalWin)
+				fmt.Printf("PlayingTotalPlayTimes:%d \n", playingTotalPlayTimes)
+				fmt.Printf("PlayingTotalRTP:%f \n", playingTotalRTP)
 				return
 			}
 		}
 	}()
 	go func() {
 		<-chSig
-		wg.Add(-playing.Concurrency)
+		chQuit <- true
 	}()
 	wg.Add(playing.Concurrency)
 	wg.Wait()
 	chQuit <- true
-	playingTotalRTP = float64(playingTotalWin) / float64(playingTotalBet)
-	fmt.Printf("PlayingTotalBet:%d \n", playingTotalBet)
-	fmt.Printf("PlayingTotalWin:%d \n", playingTotalWin)
-	fmt.Printf("PlayingTotalPlayTimes:%d \n", playingTotalPlayTimes)
-	fmt.Printf("PlayingTotalRTP:%f \n", playingTotalRTP)
 }
