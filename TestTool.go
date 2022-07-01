@@ -33,6 +33,7 @@ func main() {
 
 	var playing Playing
 	var wg sync.WaitGroup
+	var end sync.WaitGroup
 
 	json.Unmarshal(configForPlaying, &playing)
 
@@ -48,17 +49,23 @@ func main() {
 
 	for index := 1; index <= playing.Concurrency; index++ {
 		go func() {
+			var totalBet = 0
+			var totalWin = 0
+			var totalPlayTimes = 0
+			var rtp = 0.0
 			defer func() {
+				rtp = float64(totalWin) / float64(totalBet)
+				fmt.Printf("TotalBet:%d\n", totalBet)
+				fmt.Printf("TotalWin:%d\n", totalWin)
+				fmt.Printf("TotalPlayTimes:%d\n", totalPlayTimes)
+				fmt.Printf("RTP:%f\n", rtp)
 				if err := recover(); err != nil {
 					wg.Done()
 				} else {
 					wg.Done()
 				}
 			}()
-			var totalBet = 0
-			var totalWin = 0
-			var totalPlayTimes = 0
-			var rtp = 0.0
+
 			for ; totalPlayTimes < playing.PlayTimes; totalPlayTimes++ {
 				res, err := http.Get("http://localhost:3000/roll")
 				if err != nil {
@@ -96,17 +103,14 @@ func main() {
 				chBet <- playing.Bet
 				chWin <- win
 				chPlayTimes <- 1
+
 			}
-
-			rtp = float64(totalWin) / float64(totalBet)
-			fmt.Printf("TotalBet:%d\n", totalBet)
-			fmt.Printf("TotalWin:%d\n", totalWin)
-			fmt.Printf("TotalPlayTimes:%d\n", totalPlayTimes)
-			fmt.Printf("RTP:%f\n", rtp)
-
 		}()
 	}
-
+	go func() {
+		<-chSig
+		chQuit <- true
+	}()
 	go func() {
 		defer os.Exit(0)
 		for {
@@ -123,15 +127,14 @@ func main() {
 				fmt.Printf("PlayingTotalWin:%d \n", playingTotalWin)
 				fmt.Printf("PlayingTotalPlayTimes:%d \n", playingTotalPlayTimes)
 				fmt.Printf("PlayingTotalRTP:%f \n", playingTotalRTP)
+				end.Done()
 				return
 			}
 		}
 	}()
-	go func() {
-		<-chSig
-		chQuit <- true
-	}()
 	wg.Add(playing.Concurrency)
 	wg.Wait()
+	end.Add(1)
 	chQuit <- true
+	end.Wait()
 }
